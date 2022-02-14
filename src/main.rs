@@ -197,28 +197,26 @@ fn test_quad(i: usize) {
     NtRule::new(vec![QuadNT::B, QuadNT::E, QuadNT::O], vec![QuadNT::O])
   ];
 
-  let mut flag = true;
-
   let mut input = Vec::new();
   input.resize(i + 2, QuadNT::C);
   input[0] = QuadNT::B;
   input[i+1] = QuadNT::F;
 
-  while flag {
+  'outer: loop {
     println!("{:?}", input);
-    flag = false;
 
     for rule in rules.iter() {
       match rule.apply(input) {
         Ok(new) => { 
           input = new;
-          flag = true;
-          break;
+          continue 'outer;
         }
         Err(old) => {
           input = old;
         }
       }
     }
+
+    break;
   }
 }
