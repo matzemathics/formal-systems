@@ -154,11 +154,11 @@ impl<NT: Eq + Clone + std::fmt::Debug> NtRule<NT> {
     None
   }
 
-  fn apply(&self, mut input: Vec<NT>) -> Result<Vec<NT>, Vec<NT>> {
+  fn apply(&self, input: &mut Vec<NT>) -> bool {
     let offset = self.find(&input);
 
     if offset.is_none() {
-      return Err(input);
+      return false;
     }
     let matched = &mut input[offset.unwrap()..offset.unwrap() + self.context.len()];
 
@@ -186,7 +186,7 @@ impl<NT: Eq + Clone + std::fmt::Debug> NtRule<NT> {
       input[cutoff..].rotate_right(right.len());
     }
 
-    Ok(input)
+    true
   }
 }
 
@@ -271,31 +271,32 @@ impl<NT: Eq + Hash + Clone, T: Tag + Hash> NCFG<NT, T> {
   }
 
   fn find(&self, input: &Vec<NT>) -> Option<(usize, usize, &Vec<NT>)> {
-    let mut qs: Vec<T> = vec![Default::default()];
+    let mut qs_a: Vec<T> = vec![Default::default()];
+    let mut qs_b: Vec<T> = vec![Default::default()];
     let mut i = 0;
 
     for b in input {
-      let mut new_qs = vec![Default::default()];
-      for q in qs {
+      for q in qs_a.drain(..) {
         if let Some(n) = self.map.get(&(b.clone(), q)) {
           match n {
             Ok((res, len)) => return Some((i + 1 - len, *len, res)),
-            Err(tag) => new_qs.push(tag.clone()),
+            Err(tag) => qs_b.push(tag.clone()),
           }
         }
       }
-      qs = new_qs;
+      std::mem::swap(&mut qs_a, &mut qs_b);
+      qs_b.push(Default::default());
       i += 1;
     }
 
     None
   }
 
-  fn apply(&self, mut input: Vec<NT>) -> Result<Vec<NT>, Vec<NT>> {
+  fn apply(&self, input: &mut Vec<NT>) -> bool {
     let match_result = self.find(&input);
 
     if match_result.is_none() {
-      return Err(input);
+      return false;
     }
 
     let (offset, matched_len, replacement) = match_result.unwrap();
@@ -325,7 +326,7 @@ impl<NT: Eq + Hash + Clone, T: Tag + Hash> NCFG<NT, T> {
       input[cutoff..].rotate_right(right.len());
     }
 
-    Ok(input)
+    true
   }
 }
 
@@ -377,14 +378,8 @@ fn test_quad(i: usize) {
 
   'outer: loop {
     for rule in rules.iter() {
-      match rule.apply(input) {
-        Ok(new) => {
-          input = new;
-          continue 'outer;
-        }
-        Err(old) => {
-          input = old;
-        }
+      if rule.apply(&mut input) {
+        continue 'outer;
       }
     }
 
@@ -445,17 +440,7 @@ fn test_quad_new(i: usize) {
   input[0] = QuadNT::B;
   input[i + 1] = QuadNT::F;
 
-  loop {
-    match ncfg.apply(input) {
-      Ok(new) => {
-        input = new;
-      }
-      Err(old) => {
-        input = old;
-        break;
-      }
-    }
-  }
+  while ncfg.apply(&mut input) { }
 
   assert_eq!(input.len(), i * i);
 }
