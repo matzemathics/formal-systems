@@ -273,20 +273,21 @@ impl<NT: Eq + Hash + Clone, T: Tag + Hash> NCFG<NT, T> {
   fn find(&self, input: &Vec<NT>) -> Option<(usize, usize, &Vec<NT>)> {
     let mut qs_a: Vec<T> = vec![Default::default()];
     let mut qs_b: Vec<T> = vec![Default::default()];
-    let mut i = 0;
 
     for b in input {
       for q in qs_a.drain(..) {
         if let Some(n) = self.map.get(&(b.clone(), q)) {
           match n {
-            Ok((res, len)) => return Some((i + 1 - len, *len, res)),
+            Ok((res, len)) => {
+              let offset = (b as *const _ as usize) - (input.as_ptr() as usize);
+              return Some((offset + 1 - len, *len, res))
+            },
             Err(tag) => qs_b.push(tag.clone()),
           }
         }
       }
       std::mem::swap(&mut qs_a, &mut qs_b);
       qs_b.push(Default::default());
-      i += 1;
     }
 
     None
